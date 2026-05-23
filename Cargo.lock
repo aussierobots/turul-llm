@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "greet-ollama"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "serde_json",
@@ -1531,7 +1531,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "turul-llm-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "serde",
@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "turul-llm-ollama"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "reqwest",
@@ -1556,7 +1556,7 @@ dependencies = [
 
 [[package]]
 name = "turul-llm-openai"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "reqwest",

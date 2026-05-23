@@ -4,6 +4,33 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] — 2026-05-23
+
+Patch release adding per-crate README files. These become the
+crates.io landing page and the leading content on docs.rs for each
+crate. No code changes; the published library API is identical to
+0.1.0.
+
+### Added
+
+- `crates/turul-llm-core/README.md` — what the trait is, what it isn't,
+  a minimal usage snippet showing `Arc<dyn LlmClient>`.
+- `crates/turul-llm-ollama/README.md` — request-to-Ollama mapping,
+  hermetic-tests note, live-mode env contract.
+- `crates/turul-llm-openai/README.md` — request-to-OpenAI mapping,
+  base-URL override for OpenAI-compatible gateways, hermetic-tests
+  note.
+
+### Internal
+
+- Workspace version bumped from 0.1.0 to 0.1.1; intra-workspace
+  `version` entries in root `Cargo.toml` updated in lockstep per
+  CLAUDE.md §Release & Publish step 1.
+- `0.1.0` remains published on crates.io (immutable per registry
+  policy) and is **not yanked** — `0.1.1` is a documentation-only
+  superset and cargo's resolver picks `0.1.1` for any `^0.1`
+  consumer.
+
 ## [0.1.0] — 2026-05-23
 
 Initial workspace scaffold. The three library crates

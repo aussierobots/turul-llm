@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Nick Hortovanyi <nick@aussierobots.com.au>"]
 license = "MIT OR Apache-2.0"
@@ -45,6 +45,6 @@ url = "2"
 # Workspace-internal crates. `path` is used during local development;
 # `version` is what the published manifest carries. Keep both fields in
 # lockstep with [workspace.package].version above.
-turul-llm-core = { path = "crates/turul-llm-core", version = "0.1.0" }
-turul-llm-ollama = { path = "crates/turul-llm-ollama", version = "0.1.0" }
-turul-llm-openai = { path = "crates/turul-llm-openai", version = "0.1.0" }
+turul-llm-core = { path = "crates/turul-llm-core", version = "0.1.1" }
+turul-llm-ollama = { path = "crates/turul-llm-ollama", version = "0.1.1" }
+turul-llm-openai = { path = "crates/turul-llm-openai", version = "0.1.1" }
