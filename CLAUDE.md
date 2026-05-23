@@ -47,15 +47,16 @@ OLLAMA_BASE_URL=http://localhost:11434 cargo run -p greet-ollama -- Ada formal
 
 ## Release & Publish (crates.io)
 
-The workspace ships **three crates**, all currently `publish = false`. First crates.io release is gated on real adopter load-testing (mirrors the discipline applied to `turul-a2a-patterns` in the sibling repo).
+The three library crates publish to crates.io; `examples/greet-ollama` stays `publish = false`. For 0.2+ ships, re-confirm the project gates in `README.md` §Roadmap before bumping.
 
-When the publish gate is reached, the sequence is the standard turul-style release flow:
+1. Bump `[workspace.package].version`. Intra-workspace deps in `[workspace.dependencies]` carry both `path` and `version` — keep in lockstep.
+2. Update `CHANGELOG.md`.
+3. Pre-publish gate: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `cargo doc --no-deps --workspace` (warning-free), `cargo package --no-verify --allow-dirty -p turul-llm-core`. Adapter packaging is deferred to `cargo publish --verify` (registry chicken-and-egg).
+4. Commit release-prep, push to `origin/main`.
+5. Tag and push **before** publish: `git tag -a vX.Y.Z <commit> -m "..."`, `git push origin vX.Y.Z`. Annotated tags only.
+6. After one authorization, publish the batch in dep order: `-p turul-llm-core` first, then `-p turul-llm-ollama` and `-p turul-llm-openai`. One authorization covers all three.
 
-1. Bump `[workspace.package].version` in root `Cargo.toml`. Crates inherit via `version.workspace = true`. Intra-workspace deps that carry an explicit `version` field need updating in lockstep.
-2. Write the `CHANGELOG.md` entry.
-3. Run pre-publish gate: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `cargo doc --no-deps --workspace`, `cargo package --no-verify --allow-dirty` per crate.
-4. Commit release-prep changes (`cargo publish` refuses a dirty tree).
-5. After explicit authorization: publish in dependency order — `turul-llm-core` first, then `turul-llm-ollama` and `turul-llm-openai` (any order; neither depends on the other). Each `cargo publish` invocation needs its own authorization.
+If a publish fails: crates.io is immutable per-crate, so prior successful uploads stay — fix and rerun only the failed ones. If a tag points at the wrong commit, `git push --delete origin vX.Y.Z`, re-tag, push.
 
 ## Architecture
 
