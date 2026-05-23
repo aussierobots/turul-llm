@@ -16,8 +16,9 @@ pub struct CompletionRequest {
     /// input. The trait deliberately carries a single string here
     /// rather than a system/user split: providers that distinguish
     /// roles can split the rendered prompt at a marker. If a future
-    /// provider needs a richer shape this becomes a hard signal that
-    /// the trait needs a structured input — see the repo's ADR-001.
+    /// provider needs role-tagged or multi-part input, the trait must
+    /// grow a structured input type rather than overloading this
+    /// field — `#[non_exhaustive]` on this struct keeps that path open.
     pub rendered_prompt: String,
 
     /// Optional JSON Schema 2020-12 document describing the expected
