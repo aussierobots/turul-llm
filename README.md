@@ -98,7 +98,8 @@ shape has been validated against two providers (Ollama + OpenAI) under
    follow-up ADRs in this repo's `docs/adr/`.
 
 Until those gates clear, downstream consumers depend on this repo via a
-local path. The trait may evolve.
+pinned `git` revision (or a local path for repo-side development). The
+trait may evolve.
 
 ## Licensing
 
