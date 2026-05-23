@@ -6,10 +6,18 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.0] — 2026-05-23
 
-Initial workspace scaffold. All crates are `publish = false` for now —
-this repo's first crates.io release is gated on real adopter
-load-testing (mirrors the discipline applied to `turul-a2a-patterns`
-in the sibling `turul-a2a` workspace).
+Initial workspace scaffold. The three library crates
+(`turul-llm-core`, `turul-llm-ollama`, `turul-llm-openai`) are
+mechanically ready for crates.io: `publish = true`, intra-workspace
+deps carry both `path` and `version`, and the full pre-publish gate
+(test / clippy / fmt / doc / `cargo package`) is green. No `cargo
+publish` has been invoked yet — authorization for the first
+crates.io upload still requires the project-policy gates from
+[`README.md`](README.md) §Roadmap (second non-toy adopter, third-provider
+validation, follow-up ADRs on streaming / retries / observability),
+mirroring the discipline applied to `turul-a2a-patterns` in the
+sibling `turul-a2a` workspace. `examples/greet-ollama` remains
+`publish = false` — examples don't ship to crates.io.
 
 ### Added — `turul-llm-core`
 
@@ -56,8 +64,17 @@ in the sibling `turul-a2a` workspace).
 - Documents the two-provider validation strategy (Ollama as primary; OpenAI as second-provider shape-check via wiremock — no live API key required).
 - Captures the seed material from `turul-a2a`'s ADR-023 §4 + §7 that motivated this repo's existence.
 
+### Fixed
+
+- `turul-llm-core` rustdoc: qualified intra-doc links to
+  `CompletionResponse::parsed_output` in `request.rs` so they resolve;
+  dropped a redundant explicit link target on `Value::String` in
+  `response.rs`. `cargo doc --no-deps --workspace` is now
+  warning-free.
+
 ### Internal
 
 - Workspace dep discipline: all deps via `[workspace.dependencies]` + `{ workspace = true }`. Mirrors the `turul-a2a` workspace convention.
-- All crates `publish = false`. First crates.io release pending adopter load-testing (publish gates to be documented when ready).
+- Intra-workspace deps in root `Cargo.toml` now carry both `path` and `version = "0.1.0"` so the published manifest resolves siblings by version while local development still uses the workspace path.
+- The three library crates carry `publish = true`; `examples/greet-ollama` stays `publish = false`. `cargo publish` invocations remain individually gated on maintainer authorization.
 - `.gitignore` extended for Rust `target/`, `.env`, IDE conventions.

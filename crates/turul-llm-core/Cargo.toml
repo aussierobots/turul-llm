@@ -9,8 +9,7 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
-publish = false
-description = "Provider-neutral LLM client trait and types. Path-only until first-release gates clear."
+description = "Provider-neutral LLM client trait and types — one async method, JSON-Schema-driven structured output, zero provider deps."
 
 [dependencies]
 serde = { workspace = true }

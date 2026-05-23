@@ -42,7 +42,9 @@ wiremock = "0.6"
 # Misc
 url = "2"
 
-# Workspace-internal crates. Path-only because this workspace is publish = false today.
-turul-llm-core = { path = "crates/turul-llm-core" }
-turul-llm-ollama = { path = "crates/turul-llm-ollama" }
-turul-llm-openai = { path = "crates/turul-llm-openai" }
+# Workspace-internal crates. `path` is used during local development;
+# `version` is what the published manifest carries. Keep both fields in
+# lockstep with [workspace.package].version above.
+turul-llm-core = { path = "crates/turul-llm-core", version = "0.1.0" }
+turul-llm-ollama = { path = "crates/turul-llm-ollama", version = "0.1.0" }
+turul-llm-openai = { path = "crates/turul-llm-openai", version = "0.1.0" }

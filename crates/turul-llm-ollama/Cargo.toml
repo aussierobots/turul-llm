@@ -9,8 +9,7 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
-publish = false
-description = "Ollama adapter for the turul-llm LlmClient trait. Path-only until first-release gates clear."
+description = "Ollama adapter for the turul-llm LlmClient trait. Targets /api/chat with structured output via the `format` field."
 
 [dependencies]
 turul-llm-core = { workspace = true }

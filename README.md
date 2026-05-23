@@ -85,9 +85,14 @@ is a defect — fix at the root.
 
 ## Roadmap
 
-Every crate in this workspace is `publish = false` today. The trait
-shape has been validated against two providers (Ollama + OpenAI) under
-`wiremock`, which is the entry criterion. The crates.io release gate is:
+The three library crates (`turul-llm-core`, `turul-llm-ollama`,
+`turul-llm-openai`) are mechanically ready for crates.io: `publish =
+true`, intra-workspace deps carry both `path` and `version`, and the
+full pre-publish gate (test / clippy / fmt / doc / `cargo package`) is
+green. The trait shape has been validated against two providers
+(Ollama + OpenAI) under `wiremock`, which is the entry criterion.
+
+No `cargo publish` has been invoked yet. The crates.io release gate is:
 
 1. A second non-toy adopter beyond `examples/greet-ollama` exercises the
    trait end-to-end (live, not stubbed).

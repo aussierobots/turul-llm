@@ -9,8 +9,7 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
-publish = false
-description = "OpenAI-compatible adapter for the turul-llm LlmClient trait. Path-only until first-release gates clear."
+description = "OpenAI-compatible adapter for the turul-llm LlmClient trait. Targets /chat/completions with response_format = json_schema."
 
 [dependencies]
 turul-llm-core = { workspace = true }
