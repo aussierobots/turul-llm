@@ -8,7 +8,7 @@ use serde_json::Value;
 /// it through their own JSON Schema validator (matching whatever schema
 /// they passed in the request). Adapters that called a free-form
 /// completion endpoint wrap the returned text into
-/// [`Value::String`](serde_json::Value::String) so the field is always
+/// [`Value::String`] so the field is always
 /// populated.
 #[derive(Debug, Clone)]
 #[non_exhaustive]

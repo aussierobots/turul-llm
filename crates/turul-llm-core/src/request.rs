@@ -8,7 +8,7 @@ use serde_json::Value;
 /// The caller is responsible for rendering the prompt — the trait does
 /// not own the template surface. `output_schema` is optional: leaving it
 /// `None` means "free-form text" and the adapter will treat the response
-/// as a raw string wrapped into [`CompletionResponse::parsed_output`].
+/// as a raw string wrapped into [`crate::response::CompletionResponse::parsed_output`].
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct CompletionRequest {
@@ -26,7 +26,7 @@ pub struct CompletionRequest {
     /// provider's structured-output API (Ollama `format`, OpenAI
     /// `response_format.json_schema.schema`, etc.). When absent the
     /// model is unconstrained and the adapter wraps any returned text
-    /// into [`CompletionResponse::parsed_output`] as a JSON string.
+    /// into [`crate::response::CompletionResponse::parsed_output`] as a JSON string.
     pub output_schema: Option<Value>,
 
     /// Generation hints. All fields are optional; adapters apply each
