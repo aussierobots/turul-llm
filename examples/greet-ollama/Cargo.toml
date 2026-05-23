@@ -1,0 +1,17 @@
+[package]
+name = "greet-ollama"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+description = "Reference example: render a prompt + JSON Schema, call Ollama via turul-llm-ollama, print structured output."
+
+[dependencies]
+turul-llm-core = { workspace = true }
+turul-llm-ollama = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

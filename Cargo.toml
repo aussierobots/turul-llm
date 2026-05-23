@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/turul-llm-core",
+  "crates/turul-llm-ollama",
+  "crates/turul-llm-openai",
+  "examples/greet-ollama",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Nick Hortovanyi <nick@aussierobots.com.au>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/aussierobots/turul-llm"
+homepage = "https://github.com/aussierobots/turul-llm"
+keywords = ["llm", "ai", "async", "tokio", "ollama"]
+categories = ["api-bindings", "asynchronous"]
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Core deps — keep turul-llm-core's transitive surface tiny.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+async-trait = "0.1"
+
+# Async runtime / IO — only adapter crates and examples pull these in.
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# HTTP — used by adapter crates only. rustls keeps us off the system OpenSSL path.
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+
+# Logging — examples only.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["registry"] }
+
+# Test deps
+wiremock = "0.6"
+
+# Misc
+url = "2"
+
+# Workspace-internal crates. Path-only because this workspace is publish = false today.
+turul-llm-core = { path = "crates/turul-llm-core" }
+turul-llm-ollama = { path = "crates/turul-llm-ollama" }
+turul-llm-openai = { path = "crates/turul-llm-openai" }
