@@ -149,7 +149,8 @@ adopter reports a real need.
 
 Future amendments to the trait shape land as new ADRs in this repo
 (ADR-002, ADR-003, ...). This ADR stays Accepted as the historical
-record of the v1 shape.
+record of the v1 shape. ADR-002 adds the shared response decode and
+send path used by the adapters; it does not change the trait shape.
 
 If a future provider integration reveals that the single
 `rendered_prompt: String` field is insufficient (the most likely

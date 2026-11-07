@@ -10,7 +10,7 @@ This repository is the home of:
 
 | Crate | Role |
 |---|---|
-| `turul-llm-core` | Provider-neutral `LlmClient` trait + request/response types + error taxonomy. Zero provider deps. |
+| `turul-llm-core` | Provider-neutral `LlmClient` trait + request/response types + error taxonomy. Zero provider deps; an optional, default-off `http` feature adds the send path the adapters share. |
 | `turul-llm-ollama` | Ollama adapter targeting `/api/chat` with structured-output `format` field. |
 | `turul-llm-openai` | OpenAI-compatible adapter targeting `/chat/completions` with `response_format = json_schema`. |
 | `examples/greet-ollama` | Runnable example: offline stub by default, live Ollama via env vars. |
@@ -23,7 +23,7 @@ The crate has no SDK pin, no retry policy, no streaming layer, no token
 budgeter. Adapters live in sibling crates so the trait stays cheap to
 depend on.
 
-The shape of the trait is documented in [docs/adr/ADR-001-llmclient-trait-shape.md](docs/adr/ADR-001-llmclient-trait-shape.md).
+The shape of the trait is documented in [docs/adr/ADR-001-llmclient-trait-shape.md](docs/adr/ADR-001-llmclient-trait-shape.md); the response decode and send path the adapters share is in [docs/adr/ADR-002-shared-chat-decode-and-send.md](docs/adr/ADR-002-shared-chat-decode-and-send.md).
 
 ## What this repo is not
 

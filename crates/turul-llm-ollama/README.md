@@ -55,6 +55,8 @@ The adapter POSTs to `{base_url}/api/chat` with:
   (Ollama's structured-output mechanism).
 - `options.{num_predict, temperature, top_p}` — derived from
   `ExecutionHints`, only emitted when the hint is `Some(_)`.
+- `think` — emitted only when set with
+  [`OllamaClient::with_think`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_think).
 - `options.num_ctx` — emitted only when set with
   [`OllamaClient::with_num_ctx`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_num_ctx).
 
@@ -74,7 +76,12 @@ response is cut off mid-JSON, so it fails with `SchemaViolation`
 (`finish_reason=length`). `max_tokens` (`num_predict`) cannot raise the
 window.
 
-Raise it in either place:
+Thinking can also be switched off with `OllamaClient::with_think(false)`,
+which frees that share of the window for models that think by default
+(for example gemma4); models without thinking support reject an explicit
+value.
+
+Raise the window in either place:
 
 - **Per client (Rust):** `OllamaClient::new(url, model).with_num_ctx(16384)`.
   The library never reads env vars; if you want one, read it in your

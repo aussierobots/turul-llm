@@ -4,6 +4,18 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.4] — 2026-11-07
+
+Patch release adding a thinking switch to the Ollama adapter.
+
+### Added
+
+- `OllamaClient::with_think(bool)` emitting the top-level `think`
+  field; omitted unless set.
+- `docs/adr/ADR-002-shared-chat-decode-and-send.md` recording the shared
+  decode/send path introduced in 0.1.3 (`ChatResponseShape`, the `http`
+  feature, the reqwest semver rule); root README notes the `http` feature.
+
 ## [0.1.3] — 2026-11-07
 
 Patch release removing duplicated response handling between the

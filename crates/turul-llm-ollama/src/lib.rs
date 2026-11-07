@@ -27,6 +27,7 @@ pub struct OllamaClient {
     model: String,
     http: reqwest::Client,
     num_ctx: Option<u32>,
+    think: Option<bool>,
 }
 
 impl OllamaClient {
@@ -52,6 +53,7 @@ impl OllamaClient {
             model: model.into(),
             http,
             num_ctx: None,
+            think: None,
         }
     }
 
@@ -64,6 +66,17 @@ impl OllamaClient {
     /// the window of the already-loaded model makes Ollama reload it.
     pub fn with_num_ctx(mut self, num_ctx: u32) -> Self {
         self.num_ctx = Some(num_ctx);
+        self
+    }
+
+    /// Enable or disable the model's thinking phase (`think`) for every
+    /// call. Thinking tokens share the context window with the prompt and
+    /// the output, so turning it off leaves more room for structured
+    /// output on models that think by default. Left unset, the model's
+    /// own default applies, and models without thinking support reject
+    /// an explicit value.
+    pub fn with_think(mut self, think: bool) -> Self {
+        self.think = Some(think);
         self
     }
 
@@ -95,6 +108,8 @@ impl Default for OllamaClient {
 struct ChatRequest<'a> {
     model: &'a str,
     stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    think: Option<bool>,
     messages: Vec<ChatMessage<'a>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     format: Option<&'a Value>,
@@ -140,6 +155,7 @@ impl LlmClient for OllamaClient {
         let body = ChatRequest {
             model: &self.model,
             stream: false,
+            think: self.think,
             messages: vec![ChatMessage {
                 role: "user",
                 content: &request.rendered_prompt,
@@ -295,6 +311,49 @@ mod tests {
             .complete(CompletionRequest::new("hi"))
             .await
             .expect("ok");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn think_reaches_request_body() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .and(body_partial_json(json!({"think": false})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "message": {"role": "assistant", "content": "ok"},
+                "done": true,
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = OllamaClient::new(server.uri(), "test-model").with_think(false);
+        client
+            .complete(CompletionRequest::new("hi"))
+            .await
+            .expect("ok");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn think_is_omitted_unless_set() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "message": {"role": "assistant", "content": "ok"},
+                "done": true,
+            })))
+            .mount(&server)
+            .await;
+
+        let client = OllamaClient::new(server.uri(), "test-model");
+        client
+            .complete(CompletionRequest::new("hi"))
+            .await
+            .expect("ok");
+        let requests = server.received_requests().await.unwrap();
+        let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+        assert!(body.get("think").is_none(), "{body}");
     }
 
     #[tokio::test(flavor = "current_thread")]
