@@ -55,10 +55,45 @@ The adapter POSTs to `{base_url}/api/chat` with:
   (Ollama's structured-output mechanism).
 - `options.{num_predict, temperature, top_p}` — derived from
   `ExecutionHints`, only emitted when the hint is `Some(_)`.
+- `options.num_ctx` — emitted only when set with
+  [`OllamaClient::with_num_ctx`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_num_ctx).
 
 The Ollama envelope is decoded by parsing `message.content` as JSON.
 If the content fails to parse, the adapter returns
-[`LlmError::SchemaViolation`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html#variant.SchemaViolation).
+[`LlmError::SchemaViolation`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html#variant.SchemaViolation)
+whose message includes Ollama's `done_reason`.
+
+## Context window
+
+The prompt, any thinking tokens (on by default for some models, e.g.
+gemma4) and the output all share one context window. Ollama's default
+depends on the host's VRAM (4k, 32k or 256k tokens; see
+`OLLAMA_CONTEXT_LENGTH` in `ollama serve --help`). When the window
+fills, Ollama stops with `done_reason: "length"` and a structured
+response is cut off mid-JSON, so it fails with `SchemaViolation`
+(`done_reason=length`). `max_tokens` (`num_predict`) cannot raise the
+window.
+
+Raise it in either place:
+
+- **Per client (Rust):** `OllamaClient::new(url, model).with_num_ctx(16384)`.
+  The library never reads env vars; if you want one, read it in your
+  application and pass it in:
+
+  ```rust
+  let mut client = OllamaClient::new(url, model);
+  if let Some(n) = std::env::var("OLLAMA_NUM_CTX").ok().and_then(|v| v.parse().ok()) {
+      client = client.with_num_ctx(n);
+  }
+  ```
+
+- **On the Ollama server:** start it with `OLLAMA_CONTEXT_LENGTH=16384`,
+  or bake `PARAMETER num_ctx 16384` into a Modelfile. Use this when you
+  cannot change the calling code.
+
+A `num_ctx` that differs from the one the model is already loaded with
+makes Ollama reload it, so use one value across the callers of a shared
+server.
 
 ## Tests are hermetic
 

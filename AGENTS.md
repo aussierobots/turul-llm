@@ -25,7 +25,7 @@ See `CHANGELOG.md` for current release.
 ```bash
 cargo build --workspace                   # Build
 cargo check --workspace                   # Type-check
-cargo test --workspace                    # Hermetic test suite (live mode opt-in)
+cargo test --workspace                    # Hermetic test suite
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 
@@ -55,18 +55,16 @@ When adding a new external dep:
 
 ## Release & Publish (crates.io)
 
-All three crates ship with `publish = false` until a publish gate is reached (mirrors `turul-a2a-patterns` in the sibling repo).
+The three library crates publish to crates.io; `examples/greet-ollama` stays `publish = false`. For 0.2+ ships, re-confirm the project gates in `README.md` §Roadmap before bumping.
 
-When the gate is reached, the sequence is the standard turul-style release flow:
+1. Bump `[workspace.package].version`. Intra-workspace deps in `[workspace.dependencies]` carry both `path` and `version` — keep in lockstep.
+2. Update `CHANGELOG.md`.
+3. Pre-publish gate: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `cargo doc --no-deps --workspace` (warning-free), `cargo package --no-verify --allow-dirty -p turul-llm-core`. Adapter packaging is deferred to `cargo publish --verify` (registry chicken-and-egg).
+4. Commit release-prep, push to `origin/main`.
+5. Tag and push **before** publish: `git tag -a vX.Y.Z <commit> -m "..."`, `git push origin vX.Y.Z`. Annotated tags only.
+6. After one authorization, publish the batch in dep order: `-p turul-llm-core` first, then `-p turul-llm-ollama` and `-p turul-llm-openai`. One authorization covers all three.
 
-1. Bump `[workspace.package].version` in root `Cargo.toml`.
-2. Update intra-workspace deps that carry an explicit `version` field.
-3. Write `CHANGELOG.md` entry.
-4. Pre-publish gate: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`, `cargo doc --no-deps --workspace`, `cargo package --no-verify --allow-dirty` per crate.
-5. Commit release-prep changes.
-6. After explicit authorization: publish in dependency order — `turul-llm-core` first, then `turul-llm-ollama` and `turul-llm-openai` (no inter-dependency, any order).
-
-Each `cargo publish` invocation needs its own authorization.
+If a publish fails: crates.io is immutable per-crate, so prior successful uploads stay — fix and rerun only the failed ones. If a tag points at the wrong commit, `git push --delete origin vX.Y.Z`, re-tag, push.
 
 ## Architecture
 
@@ -121,6 +119,6 @@ Comments serve readers six months from now with no project context.
 
 ### Test Discipline
 
-`wiremock` pins request/response shape for each adapter. Default `cargo test --workspace` is hermetic — no live Ollama or live OpenAI required. Live mode is opt-in via per-adapter env vars.
+`wiremock` pins request/response shape for each adapter. Default `cargo test --workspace` is hermetic — no live Ollama or live OpenAI required. Live mode is opt-in in `examples/greet-ollama` via env vars; the adapters never read env vars.
 
-New adapters: mirror the wiremock pattern, pin URL + body + decoding, document the live-mode env var convention in adapter rustdoc.
+New adapters: mirror the wiremock pattern, pin URL + body + decoding, adapters take configuration through constructors and never read env vars.

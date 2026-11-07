@@ -22,6 +22,7 @@ pub struct OllamaClient {
     base_url: String,
     model: String,
     http: reqwest::Client,
+    num_ctx: Option<u32>,
 }
 
 impl OllamaClient {
@@ -46,7 +47,20 @@ impl OllamaClient {
             base_url: normalised,
             model: model.into(),
             http,
+            num_ctx: None,
         }
+    }
+
+    /// Set the context window (`options.num_ctx`) requested for every call.
+    ///
+    /// Ollama's default window depends on the host (4096 tokens on
+    /// smaller-VRAM machines) and is shared by the prompt, any thinking
+    /// tokens and the output; generation stops with `done_reason: "length"`
+    /// when it fills, regardless of `max_tokens`. A value that differs from
+    /// the window of the already-loaded model makes Ollama reload it.
+    pub fn with_num_ctx(mut self, num_ctx: u32) -> Self {
+        self.num_ctx = Some(num_ctx);
+        self
     }
 
     /// The model identifier this client is bound to.
@@ -93,6 +107,8 @@ struct ChatMessage<'a> {
 #[derive(Serialize, Default)]
 struct OllamaOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
+    num_ctx: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     num_predict: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
@@ -101,11 +117,12 @@ struct OllamaOptions {
 }
 
 impl OllamaOptions {
-    fn from_hints(hints: &ExecutionHints) -> Option<Self> {
-        if hints.is_empty() {
+    fn new(hints: &ExecutionHints, num_ctx: Option<u32>) -> Option<Self> {
+        if hints.is_empty() && num_ctx.is_none() {
             return None;
         }
         Some(Self {
+            num_ctx,
             num_predict: hints.max_tokens,
             temperature: hints.temperature,
             top_p: hints.top_p,
@@ -124,7 +141,7 @@ impl LlmClient for OllamaClient {
                 content: &request.rendered_prompt,
             }],
             format: request.output_schema.as_ref(),
-            options: OllamaOptions::from_hints(&request.execution_hints),
+            options: OllamaOptions::new(&request.execution_hints, self.num_ctx),
         };
 
         let url = self.chat_url();
@@ -163,8 +180,12 @@ impl LlmClient for OllamaClient {
         // so `parsed_output` is always populated.
         let parsed = if request.output_schema.is_some() {
             serde_json::from_str::<Value>(content).map_err(|e| {
+                let done_reason = envelope
+                    .get("done_reason")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("unknown");
                 LlmError::SchemaViolation(format!(
-                    "structured-output payload was not valid JSON: {e}: {content}"
+                    "structured-output payload was not valid JSON (done_reason={done_reason}): {e}: {content}"
                 ))
             })?
         } else {
@@ -290,6 +311,51 @@ mod tests {
             .await
             .expect_err("must fail");
         assert!(matches!(err, LlmError::SchemaViolation(_)), "got {err:?}");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn num_ctx_reaches_request_options() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .and(body_partial_json(json!({"options": {"num_ctx": 16384}})))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "message": {"role": "assistant", "content": "ok"},
+                "done": true,
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = OllamaClient::new(server.uri(), "test-model").with_num_ctx(16384);
+        client
+            .complete(CompletionRequest::new("hi"))
+            .await
+            .expect("ok");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn truncated_structured_payload_reports_done_reason() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/chat"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "message": {"role": "assistant", "content": "{\"a\": \"cut"},
+                "done": true,
+                "done_reason": "length",
+            })))
+            .mount(&server)
+            .await;
+
+        let client = OllamaClient::new(server.uri(), "test-model");
+        let err = client
+            .complete(CompletionRequest::new("hi").with_output_schema(json!({"type": "object"})))
+            .await
+            .expect_err("must fail");
+        match err {
+            LlmError::SchemaViolation(m) => assert!(m.contains("done_reason=length"), "{m}"),
+            other => panic!("got {other:?}"),
+        }
     }
 
     #[test]

@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cargo build --workspace                   # Build all crates
 cargo check --workspace                   # Type-check
-cargo test --workspace                    # Run all tests (hermetic; live mode opt-in)
+cargo test --workspace                    # Run all tests (hermetic)
 cargo clippy --workspace --all-targets -- -D warnings  # Lint (deny warnings)
 cargo fmt --all -- --check                # Format check
 
@@ -63,8 +63,8 @@ If a publish fails: crates.io is immutable per-crate, so prior successful upload
 ### Crate Structure
 
 - `turul-llm-core` — provider-neutral `LlmClient` trait + `CompletionRequest` / `CompletionResponse` / `ExecutionHints` types + `LlmError` taxonomy. No HTTP / runtime deps. The contract surface.
-- `turul-llm-ollama` — Ollama `/api/chat` adapter. Structured output via the `format` field. Live mode opt-in via env (`OLLAMA_BASE_URL` / `RUN_OLLAMA_SMOKE=1`); hermetic CI by default.
-- `turul-llm-openai` — OpenAI-compatible adapter via `response_format = { type: "json_schema", ... }`. Live mode requires `OPENAI_API_KEY` and is not exercised by default CI.
+- `turul-llm-ollama` — Ollama `/api/chat` adapter. Structured output via the `format` field. Configured through constructors (`with_num_ctx`, `with_http_client`); hermetic CI by default.
+- `turul-llm-openai` — OpenAI-compatible adapter via `response_format = { type: "json_schema", ... }`. The API key is passed to the constructor by the caller; not exercised by live calls in default CI.
 - `examples/greet-ollama` — runnable example demonstrating the trait + Ollama adapter end-to-end.
 
 ### Trait Shape
@@ -111,7 +111,7 @@ These rot. They mean something to whoever wrote them this week and **nothing** t
 **Do write:**
 
 - The invariant: "Trait must stay object-safe — adopters compose adapters as `&dyn LlmClient`."
-- The contract: "Live mode is opt-in via `OLLAMA_BASE_URL`; default test path uses wiremock to keep CI hermetic."
+- The contract: "The default test path uses wiremock to keep CI hermetic; adapters never read env vars."
 - The "why" in timeless terms.
 - Upstream provider citations (Ollama / OpenAI API docs with stable URLs) when the comment would be incomplete without them. Sparingly.
 
@@ -124,13 +124,13 @@ These rot. They mean something to whoever wrote them this week and **nothing** t
 
 ### Test Discipline
 
-Tests use `wiremock` to pin the request shape each adapter emits and the response shape each provider returns. **Default test path is hermetic** — `cargo test --workspace` never requires a live Ollama or live OpenAI. Live mode is opt-in via per-adapter env vars.
+Tests use `wiremock` to pin the request shape each adapter emits and the response shape each provider returns. **Default test path is hermetic** — `cargo test --workspace` never requires a live Ollama or live OpenAI. Live mode is opt-in in `examples/greet-ollama` via env vars; the adapters never read env vars.
 
 When adding a new provider adapter:
 
 1. Mirror the wiremock pattern from `turul-llm-ollama::tests` or `turul-llm-openai::tests`.
 2. Pin: request URL, request body shape (headers + JSON), response decoding.
-3. Document the live-mode env var convention in the adapter's `lib.rs` rustdoc.
+3. Adapters take configuration through constructors and never read env vars; live-mode env vars belong to the example crate only.
 
 ### Adopter Surface
 
@@ -141,4 +141,4 @@ let client: Arc<dyn LlmClient> = Arc::new(OllamaClient::new("http://localhost:11
 let resp = client.complete(req).await?;
 ```
 
-Provider-specific options live on adapter constructors (`OllamaClient::with_options(...)`, `OpenAiClient::with_organization(...)` etc.), not on `CompletionRequest`.
+Provider-specific options live on adapter constructors (`OllamaClient::with_num_ctx(...)`, `OpenAiClient::with_schema_name(...)` etc.), not on `CompletionRequest`.

@@ -19,7 +19,7 @@ hidden framework. Read it alongside this README.
    in a given style.
 2. Attaches a JSON Schema (`{ greeting: string }`) so the response is
    constrained to structured output.
-3. Sends the request through an `Arc<dyn LlmClient>` — either the real
+3. Sends the request through a `Box<dyn LlmClient>` — either the real
    `OllamaClient` or an in-process `OfflineStub`, chosen at runtime.
 4. Pretty-prints the parsed JSON response.
 
@@ -87,9 +87,9 @@ returns under the schema.
 | `OLLAMA_MODEL`     | Model name to request. Defaults to `llama3.1`.                                          |
 | `RUST_LOG`         | Standard `tracing-subscriber` filter, e.g. `RUST_LOG=turul_llm_ollama=debug`.            |
 
-The live-mode env convention matches the
-[`turul-llm-ollama`](../../crates/turul-llm-ollama) adapter's own test
-gate — learn it once, use it everywhere.
+These variables are read by this example only; the
+[`turul-llm-ollama`](../../crates/turul-llm-ollama) adapter takes its
+configuration through constructors and never reads env vars.
 
 ## What to look at in the source
 

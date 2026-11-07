@@ -72,7 +72,7 @@ contract can grow additively without breaking adopters.
   without changing the trait.
 - Not a JSON Schema validator. Adapters surface
   [`LlmError::SchemaViolation`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html#variant.SchemaViolation)
-  when the provider's structured-output API rejects the payload;
+  when the model's output is not valid JSON;
   callers can run their preferred validator on `parsed_output` after
   `complete` returns.
 

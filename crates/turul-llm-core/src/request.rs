@@ -75,8 +75,8 @@ pub struct ExecutionHints {
 
 impl ExecutionHints {
     /// Construct an empty hints block — equivalent to
-    /// [`ExecutionHints::default`] but available in `const` contexts
-    /// and as a builder entry point.
+    /// [`ExecutionHints::default`] and the entry point for the builder
+    /// methods.
     pub fn new() -> Self {
         Self {
             max_tokens: None,

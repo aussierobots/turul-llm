@@ -86,13 +86,9 @@ is a defect — fix at the root.
 ## Roadmap
 
 The three library crates (`turul-llm-core`, `turul-llm-ollama`,
-`turul-llm-openai`) are mechanically ready for crates.io: `publish =
-true`, intra-workspace deps carry both `path` and `version`, and the
-full pre-publish gate (test / clippy / fmt / doc / `cargo package`) is
-green. The trait shape has been validated against two providers
-(Ollama + OpenAI) under `wiremock`, which is the entry criterion.
-
-No `cargo publish` has been invoked yet. The crates.io release gate is:
+`turul-llm-openai`) are published on crates.io. The trait shape has been
+validated against two providers (Ollama + OpenAI) under `wiremock`.
+Before a 0.2 release, the following should land:
 
 1. A second non-toy adopter beyond `examples/greet-ollama` exercises the
    trait end-to-end (live, not stubbed).
@@ -102,9 +98,8 @@ No `cargo publish` has been invoked yet. The crates.io release gate is:
 3. Decisions on streaming, retries, and observability are landed as
    follow-up ADRs in this repo's `docs/adr/`.
 
-Until those gates clear, downstream consumers depend on this repo via a
-pinned `git` revision (or a local path for repo-side development). The
-trait may evolve.
+The trait may evolve until then. Per-release changes are in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Licensing
 

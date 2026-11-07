@@ -4,6 +4,27 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.2] — 2026-11-07
+
+Patch release: gemma4 structured output was truncated at Ollama's
+default context window, which `max_tokens` cannot raise.
+
+### Added
+
+- `OllamaClient::with_num_ctx(u32)` emitting `options.num_ctx`.
+- Context-window section in the `turul-llm-ollama` README.
+
+### Changed
+
+- MSRV raised from 1.85 to 1.94; dependencies refreshed within that MSRV.
+- Removed unused workspace dependencies `futures` and `url`.
+- Added `.github/workflows/ci.yml` (fmt, clippy `-D warnings`, tests, warning-free docs on stable; `cargo check` on the 1.94 MSRV), matching the sibling turul workspaces.
+- Added release (fat LTO, one codegen unit) and trimmed dev/test debuginfo profiles, matching the sibling turul workspaces.
+- Removed the unused `turul-llm-openai` workspace entry and the redundant `homepage` field.
+- Docs: README roadmap and AGENTS.md release flow now reflect the published crates and match CLAUDE.md; stale env-var, API-name and rustdoc claims corrected.
+- `turul-llm-ollama`: the `SchemaViolation` message for unparseable
+  structured output now includes Ollama's `done_reason`.
+
 ## [0.1.1] — 2026-05-23
 
 Patch release adding per-crate README files. These become the
@@ -58,7 +79,7 @@ sibling `turul-a2a` workspace. `examples/greet-ollama` remains
   ```
 - Object-safe (`&dyn LlmClient` works); `Send + Sync` bounds; static
   compile-time assertions in `client::tests`.
-- `CompletionRequest { rendered_prompt: String, output_schema: Option<Value>, execution_hints: ExecutionHints }` with `#[non_exhaustive]` for additive evolution. Builder methods (`with_output_schema`, `with_hints`).
+- `CompletionRequest { rendered_prompt: String, output_schema: Option<Value>, execution_hints: ExecutionHints }` with `#[non_exhaustive]` for additive evolution. Builder methods (`with_output_schema`, `with_execution_hints`).
 - `ExecutionHints { max_tokens: Option<u32>, temperature: Option<f32>, top_p: Option<f32> }` — provider-neutral execution knobs only; provider-specific options live on adapter constructors, not on the request.
 - `CompletionResponse { parsed_output: serde_json::Value }` — the validated structured JSON the model returned.
 - `LlmError` enum (`#[non_exhaustive]`): `Transport(String)`, `Provider(String)`, `SchemaViolation(String)`, `Timeout`, `Other(String)`. `thiserror` derived.
