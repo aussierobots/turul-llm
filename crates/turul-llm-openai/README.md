@@ -76,6 +76,12 @@ The adapter POSTs to `{base_url}/chat/completions` with:
 - `max_tokens` / `temperature` / `top_p` derived from
   `ExecutionHints`, only emitted when the hint is `Some(_)`.
 
+A request's `ContextBudget` output cap is sent as `max_tokens`
+(OpenAI has no per-call context window; the window is used only by
+`turul_llm_core::GuardedClient`). Responses carry `usage`
+(`usage.prompt_tokens`, `usage.completion_tokens`) and `stop_reason`
+(`finish_reason`) when reported.
+
 The OpenAI envelope is decoded via `choices[0].message.content`,
 parsed as JSON. If parsing fails, `SchemaViolation` includes the
 choice's `finish_reason` (for example `length` for a truncated reply).

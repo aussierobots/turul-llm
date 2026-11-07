@@ -66,7 +66,7 @@ If a publish fails: crates.io is immutable per-crate, so prior successful upload
 ### Crate Structure
 
 - `turul-llm-core` — provider-neutral `LlmClient` trait + `CompletionRequest` / `CompletionResponse` / `ExecutionHints` types + `LlmError` taxonomy. No HTTP client unless the default-off `http` feature (shared send path used by the adapters) is on; no runtime deps. The contract surface.
-- `turul-llm-ollama` — Ollama `/api/chat` adapter. Structured output via the `format` field. Configured through constructors (`with_num_ctx`, `with_http_client`); hermetic CI by default.
+- `turul-llm-ollama` — Ollama `/api/chat` (or `/api/generate`) adapter. Structured output via the `format` field. Configured through constructors (`with_num_ctx`, `with_http_client`); hermetic CI by default.
 - `turul-llm-openai` — OpenAI-compatible adapter via `response_format = { type: "json_schema", ... }`. The API key is passed to the constructor by the caller; not exercised by live calls in default CI.
 - `examples/greet-ollama` — runnable example demonstrating the trait + Ollama adapter end-to-end.
 

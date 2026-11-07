@@ -4,6 +4,33 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.5] — 2026-11-07
+
+Patch release adding opt-in bounded generation (additive; existing calls
+are unchanged). Design: `docs/adr/ADR-003-bounded-generation.md`.
+
+### Added
+
+- `ContextBudget` (`NonZeroU32` context window and output cap) on
+  `CompletionRequest::with_budget`; `CompletionRequest::max_output_tokens`
+  resolves the effective cap. Ollama maps it to `num_ctx`/`num_predict`
+  (overriding `with_num_ctx`), OpenAI to `max_tokens`.
+- `CompletionResponse::usage` (`Usage`), `stop_reason` (`StopReason`) and
+  `token_ids`, filled by both adapters; absent provider values stay `None`.
+- `TokenCounter` (async, receives the whole request) and `GuardedClient`
+  with a required `PromptCountPolicy`: refuses before sending when the
+  prompt plus output cap exceeds the window, and returns an error unless
+  generation ended with a clean stop.
+- `LlmError` variants `InvalidRequest`, `ContextOverflow`,
+  `IncompleteGeneration`, `UsageMissing`, `UsageMismatch`,
+  `ModelMismatch`.
+- `OllamaClient::with_model_digest`: checks the weights blob digest via
+  `/api/show` before each call (models without a local weights blob
+  cannot be pinned).
+- `OllamaClient::with_generate_endpoint`: templated `/api/generate`, which
+  returns token ids (`context`) exposed verbatim as `token_ids`.
+- `ChatResponseShape::with_usage_pointers` / `with_token_ids_pointer`.
+
 ## [0.1.4] — 2026-11-07
 
 Patch release adding a thinking switch to the Ollama adapter.

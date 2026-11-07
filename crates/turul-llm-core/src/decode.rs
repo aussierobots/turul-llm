@@ -8,21 +8,30 @@
 use serde_json::Value;
 
 use crate::error::LlmError;
-use crate::response::CompletionResponse;
+use crate::response::{CompletionResponse, StopReason, Usage};
 
 /// Where a chat-style provider puts the fields the decoder needs.
 ///
-/// Both locators are RFC 6901 JSON pointers into the response envelope.
-/// The struct is `#[non_exhaustive]` so further locators (for example
-/// token usage) can be added without breaking adapters.
+/// The content and finish-reason locators are required; token usage and
+/// token ids are optional and added with the `with_*` builders. All are
+/// RFC 6901 JSON pointers into the response envelope. The struct is
+/// `#[non_exhaustive]` so further locators can be added without breaking
+/// adapters.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy)]
 pub struct ChatResponseShape<'a> {
     /// Pointer to the assistant message text.
     pub content_pointer: &'a str,
-    /// Pointer to the provider's finish/done reason; optional in the
-    /// response and used for diagnostics only.
+    /// Pointer to the provider's finish/done reason. The value may be
+    /// absent from a response; it becomes the response's stop reason and
+    /// is quoted in structured-output parse errors.
     pub finish_reason_pointer: &'a str,
+    /// Pointer to the prompt token count, if the provider reports one.
+    pub prompt_tokens_pointer: Option<&'a str>,
+    /// Pointer to the generated token count, if the provider reports one.
+    pub output_tokens_pointer: Option<&'a str>,
+    /// Pointer to an array of token ids, if the provider returns one.
+    pub token_ids_pointer: Option<&'a str>,
 }
 
 impl<'a> ChatResponseShape<'a> {
@@ -31,13 +40,38 @@ impl<'a> ChatResponseShape<'a> {
         Self {
             content_pointer,
             finish_reason_pointer,
+            prompt_tokens_pointer: None,
+            output_tokens_pointer: None,
+            token_ids_pointer: None,
         }
+    }
+
+    /// Also read token usage from the given pointers.
+    pub const fn with_usage_pointers(
+        mut self,
+        prompt_tokens_pointer: &'a str,
+        output_tokens_pointer: &'a str,
+    ) -> Self {
+        self.prompt_tokens_pointer = Some(prompt_tokens_pointer);
+        self.output_tokens_pointer = Some(output_tokens_pointer);
+        self
+    }
+
+    /// Also read an array of token ids from the given pointer. A value
+    /// at that pointer that is not an array of token ids is a provider
+    /// error; an absent value is `None`.
+    pub const fn with_token_ids_pointer(mut self, token_ids_pointer: &'a str) -> Self {
+        self.token_ids_pointer = Some(token_ids_pointer);
+        self
     }
 
     /// Decode an HTTP response body from a chat-style provider.
     ///
     /// - A non-2xx `status` becomes [`LlmError::Provider`].
     /// - A missing content string is [`LlmError::Provider`].
+    /// - The finish reason and token counts, when present, are returned
+    ///   on the response as [`StopReason`] and [`Usage`]; absent values
+    ///   stay `None`.
     /// - When `structured` is true the content must parse as JSON,
     ///   otherwise [`LlmError::SchemaViolation`] is returned with the
     ///   finish reason in the message (a reason such as `length` points
@@ -83,7 +117,50 @@ impl<'a> ChatResponseShape<'a> {
             Value::String(content.to_string())
         };
 
-        Ok(CompletionResponse::new(parsed))
+        let mut response = CompletionResponse::new(parsed);
+        if let Some(reason) = envelope
+            .pointer(self.finish_reason_pointer)
+            .and_then(Value::as_str)
+        {
+            response = response.with_stop_reason(StopReason::from_provider(reason));
+        }
+        let count = |pointer: Option<&str>| -> Result<Option<u32>, LlmError> {
+            let Some((pointer, value)) = pointer.and_then(|p| Some((p, envelope.pointer(p)?)))
+            else {
+                return Ok(None);
+            };
+            value
+                .as_u64()
+                .and_then(|n| u32::try_from(n).ok())
+                .map(Some)
+                .ok_or_else(|| {
+                    LlmError::Provider(format!("{pointer} is not a token count: {value}"))
+                })
+        };
+        if let Some(value) = self.token_ids_pointer.and_then(|p| envelope.pointer(p)) {
+            let ids = value
+                .as_array()
+                .and_then(|a| {
+                    a.iter()
+                        .map(|v| v.as_u64().and_then(|n| u32::try_from(n).ok()))
+                        .collect::<Option<Vec<u32>>>()
+                })
+                .ok_or_else(|| {
+                    LlmError::Provider(format!(
+                        "{} is not an array of token ids",
+                        self.token_ids_pointer.unwrap_or_default()
+                    ))
+                })?;
+            response = response.with_token_ids(ids);
+        }
+        let usage = Usage::new(
+            count(self.prompt_tokens_pointer)?,
+            count(self.output_tokens_pointer)?,
+        );
+        if usage != Usage::default() {
+            response = response.with_usage(usage);
+        }
+        Ok(response)
     }
 }
 
@@ -140,6 +217,81 @@ mod tests {
         assert!(
             matches!(&err, LlmError::SchemaViolation(m) if m.contains("finish_reason=length")),
             "{err:?}"
+        );
+    }
+
+    #[test]
+    fn stop_reason_and_usage_are_decoded() {
+        let body = json!({
+            "message": {"content": "hi"},
+            "done_reason": "length",
+            "pe": 7,
+            "ev": 3
+        })
+        .to_string();
+        let out = ChatResponseShape::new(CONTENT, REASON)
+            .with_usage_pointers("/pe", "/ev")
+            .decode(URL, 200, &body, false)
+            .expect("ok");
+        assert_eq!(out.stop_reason, Some(StopReason::Length));
+        assert_eq!(out.usage, Some(Usage::new(Some(7), Some(3))));
+    }
+
+    #[test]
+    fn absent_stop_reason_and_usage_stay_none() {
+        let body = json!({"message": {"content": "hi"}}).to_string();
+        let out = ChatResponseShape::new(CONTENT, REASON)
+            .with_usage_pointers("/pe", "/ev")
+            .decode(URL, 200, &body, false)
+            .expect("ok");
+        assert_eq!(out.stop_reason, None);
+        assert_eq!(out.usage, None);
+    }
+
+    #[test]
+    fn token_ids_are_decoded_verbatim_and_validated() {
+        let shape = ChatResponseShape::new(CONTENT, REASON).with_token_ids_pointer("/ctx");
+        let body = json!({"message": {"content": "hi"}, "ctx": [1, 2, 3]}).to_string();
+        assert_eq!(
+            shape.decode(URL, 200, &body, false).unwrap().token_ids,
+            Some(vec![1, 2, 3])
+        );
+
+        let absent = json!({"message": {"content": "hi"}}).to_string();
+        assert_eq!(
+            shape.decode(URL, 200, &absent, false).unwrap().token_ids,
+            None
+        );
+
+        let bad = json!({"message": {"content": "hi"}, "ctx": [1, "x"]}).to_string();
+        let err = shape.decode(URL, 200, &bad, false).expect_err("must fail");
+        assert!(
+            matches!(&err, LlmError::Provider(m) if m.contains("/ctx")),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn malformed_token_count_is_a_provider_error() {
+        let shape = ChatResponseShape::new(CONTENT, REASON).with_usage_pointers("/pe", "/ev");
+        for bad in [json!(-1), json!(1.5), json!("7"), json!(5_000_000_000u64)] {
+            let body = json!({"message": {"content": "hi"}, "pe": bad, "ev": 1}).to_string();
+            let err = shape.decode(URL, 200, &body, false).expect_err("must fail");
+            assert!(
+                matches!(&err, LlmError::Provider(m) if m.contains("/pe")),
+                "{bad}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_stop_reason_is_kept_verbatim() {
+        let body =
+            json!({"message": {"content": "hi"}, "done_reason": "content_filter"}).to_string();
+        let out = decode(200, &body, false).expect("ok");
+        assert_eq!(
+            out.stop_reason,
+            Some(StopReason::Other("content_filter".into()))
         );
     }
 

@@ -68,6 +68,35 @@ without changing this function.
   module's API follows reqwest's major version.
   Adopters do not need either.
 
+## Bounded generation (opt-in)
+
+Callers that must never act on a truncated completion attach a
+`ContextBudget` to the request and wrap the client in a `GuardedClient`:
+
+```rust
+use std::{num::NonZeroU32, sync::Arc};
+use turul_llm_core::{
+    CompletionRequest, ContextBudget, GuardedClient, LlmClient, PromptCountPolicy, TokenCounter,
+};
+
+// `inner` is any adapter; `counter` is your own `TokenCounter`.
+let guarded = GuardedClient::new(inner, counter, PromptCountPolicy::Exact);
+let request = CompletionRequest::new("...").with_budget(ContextBudget::new(
+    NonZeroU32::new(8192).unwrap(), // context window
+    NonZeroU32::new(1024).unwrap(), // output cap
+));
+let response = guarded.complete(request).await?; // Err unless generation stopped cleanly
+```
+
+The guard refuses before sending when the counted prompt plus the output
+cap exceeds the window, and returns an error unless the provider reported
+a clean stop. `TokenCounter` receives the whole request and must count
+what the provider actually tokenises, including any chat template and
+default system text; the crate ships no tokenizer. `PromptCountPolicy`
+has no default: `Exact` requires the provider's prompt count to equal the
+local one, `Ignore` skips that check. The window and the output cap both
+include thinking tokens.
+
 All public structs and the error enum are `#[non_exhaustive]`, so the
 contract can grow additively without breaking adopters.
 

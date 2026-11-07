@@ -38,6 +38,7 @@
 pub mod client;
 pub mod decode;
 pub mod error;
+pub mod guard;
 #[cfg(feature = "http")]
 pub mod http;
 pub mod request;
@@ -46,5 +47,6 @@ pub mod response;
 pub use client::LlmClient;
 pub use decode::ChatResponseShape;
 pub use error::LlmError;
-pub use request::{CompletionRequest, ExecutionHints};
-pub use response::CompletionResponse;
+pub use guard::{GuardedClient, PromptCountPolicy, TokenCounter};
+pub use request::{CompletionRequest, ContextBudget, ExecutionHints};
+pub use response::{CompletionResponse, StopReason, Usage};

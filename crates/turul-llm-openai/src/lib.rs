@@ -19,8 +19,7 @@ use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
 use turul_llm_core::{
-    ChatResponseShape, CompletionRequest, CompletionResponse, ExecutionHints, LlmClient, LlmError,
-    http::send_chat,
+    ChatResponseShape, CompletionRequest, CompletionResponse, LlmClient, LlmError, http::send_chat,
 };
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
@@ -126,10 +125,10 @@ struct JsonSchemaBlock<'a> {
     strict: bool,
 }
 
-fn apply_hints(req: &mut ChatRequest<'_>, hints: &ExecutionHints) {
-    req.max_tokens = hints.max_tokens;
-    req.temperature = hints.temperature;
-    req.top_p = hints.top_p;
+fn apply_hints(req: &mut ChatRequest<'_>, request: &CompletionRequest) {
+    req.max_tokens = request.max_output_tokens();
+    req.temperature = request.execution_hints.temperature;
+    req.top_p = request.execution_hints.top_p;
 }
 
 #[async_trait]
@@ -158,13 +157,14 @@ impl LlmClient for OpenAiClient {
             temperature: None,
             top_p: None,
         };
-        apply_hints(&mut body, &request.execution_hints);
+        apply_hints(&mut body, &request);
 
         let url = self.endpoint();
         send_chat(
             self.http.post(&url).bearer_auth(&self.api_key).json(&body),
             &url,
-            &ChatResponseShape::new("/choices/0/message/content", "/choices/0/finish_reason"),
+            &ChatResponseShape::new("/choices/0/message/content", "/choices/0/finish_reason")
+                .with_usage_pointers("/usage/prompt_tokens", "/usage/completion_tokens"),
             request.output_schema.is_some(),
         )
         .await
@@ -175,6 +175,7 @@ impl LlmClient for OpenAiClient {
 mod tests {
     use super::*;
     use serde_json::json;
+    use turul_llm_core::ExecutionHints;
     use wiremock::matchers::{body_partial_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -283,6 +284,55 @@ mod tests {
             .await
             .expect_err("must fail");
         assert!(matches!(err, LlmError::SchemaViolation(_)), "got {err:?}");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn budget_output_cap_overrides_the_max_tokens_hint() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .and(body_partial_json(json!({"max_tokens": 512})))
+            .respond_with(chat_envelope("ok"))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = OpenAiClient::with_base_url(server.uri(), "k", "m");
+        let request = CompletionRequest::new("hi")
+            .with_execution_hints(ExecutionHints::new().with_max_tokens(7))
+            .with_budget(turul_llm_core::ContextBudget::new(
+                std::num::NonZeroU32::new(8192).unwrap(),
+                std::num::NonZeroU32::new(512).unwrap(),
+            ));
+        client.complete(request).await.expect("ok");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn usage_and_stop_reason_are_decoded() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "ok"},
+                    "finish_reason": "length"
+                }],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 5, "total_tokens": 14}
+            })))
+            .mount(&server)
+            .await;
+
+        let client = OpenAiClient::with_base_url(server.uri(), "k", "m");
+        let out = client
+            .complete(CompletionRequest::new("hi"))
+            .await
+            .expect("ok");
+        assert_eq!(out.stop_reason, Some(turul_llm_core::StopReason::Length));
+        assert_eq!(
+            out.usage,
+            Some(turul_llm_core::Usage::new(Some(9), Some(5)))
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]

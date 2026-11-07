@@ -1,5 +1,7 @@
 //! Request types passed to [`LlmClient::complete`](crate::client::LlmClient::complete).
 
+use std::num::NonZeroU32;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -32,6 +34,37 @@ pub struct CompletionRequest {
     /// Generation hints. All fields are optional; adapters apply each
     /// hint only if the provider's API supports it.
     pub execution_hints: ExecutionHints,
+
+    /// Optional explicit sizing. When present it takes precedence over
+    /// [`ExecutionHints::max_tokens`] and, for providers with a
+    /// per-request context window, sets that window.
+    pub budget: Option<ContextBudget>,
+}
+
+/// Explicit per-request sizing: the context window the provider will
+/// give the request and the cap on generated tokens.
+///
+/// Both values are mandatory by construction and cannot be zero. Both
+/// count thinking tokens, which share the window with the prompt and
+/// the output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ContextBudget {
+    /// Tokens available to the prompt, any thinking and the output
+    /// together.
+    pub context_tokens: NonZeroU32,
+    /// Upper bound on generated tokens.
+    pub max_output_tokens: NonZeroU32,
+}
+
+impl ContextBudget {
+    /// Build a budget from a context window and an output cap.
+    pub const fn new(context_tokens: NonZeroU32, max_output_tokens: NonZeroU32) -> Self {
+        Self {
+            context_tokens,
+            max_output_tokens,
+        }
+    }
 }
 
 impl CompletionRequest {
@@ -42,6 +75,7 @@ impl CompletionRequest {
             rendered_prompt: rendered_prompt.into(),
             output_schema: None,
             execution_hints: ExecutionHints::default(),
+            budget: None,
         }
     }
 
@@ -55,6 +89,22 @@ impl CompletionRequest {
     pub fn with_execution_hints(mut self, hints: ExecutionHints) -> Self {
         self.execution_hints = hints;
         self
+    }
+
+    /// Builder-style setter for [`budget`](Self::budget).
+    pub fn with_budget(mut self, budget: ContextBudget) -> Self {
+        self.budget = Some(budget);
+        self
+    }
+
+    /// The effective cap on generated tokens: the budget's
+    /// `max_output_tokens` if a budget is set, otherwise
+    /// [`ExecutionHints::max_tokens`]. Adapters use this instead of
+    /// reading either field directly.
+    pub fn max_output_tokens(&self) -> Option<u32> {
+        self.budget
+            .map(|b| b.max_output_tokens.get())
+            .or(self.execution_hints.max_tokens)
     }
 }
 

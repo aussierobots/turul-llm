@@ -49,4 +49,59 @@ pub enum LlmError {
     /// prefer the more specific variants when applicable.
     #[error("LLM error: {0}")]
     Other(String),
+
+    /// The request was refused before any call because it is not valid
+    /// for the client handling it (for example a guarded client given a
+    /// request without a budget).
+    #[error("invalid LLM request: {reason}")]
+    InvalidRequest {
+        /// What is wrong with the request.
+        reason: String,
+    },
+
+    /// The prompt plus the output cap does not fit the context window.
+    /// Nothing was sent.
+    #[error(
+        "prompt ({prompt_tokens}) + max output ({max_output_tokens}) tokens exceed the context window ({context_tokens})"
+    )]
+    ContextOverflow {
+        /// Tokens the caller's counter reported for the prompt.
+        prompt_tokens: u32,
+        /// The requested output cap.
+        max_output_tokens: u32,
+        /// The context window the request was sized against.
+        context_tokens: u32,
+    },
+
+    /// Generation did not end on its own: the provider reported a stop
+    /// reason other than `stop`, or none.
+    #[error("generation did not complete (stop reason: {})", stop_reason.as_deref().unwrap_or("missing"))]
+    IncompleteGeneration {
+        /// The provider's reason, verbatim; `None` when it reported none.
+        stop_reason: Option<String>,
+    },
+
+    /// The provider reported no prompt token count where one was
+    /// required.
+    #[error("provider reported no prompt token count")]
+    UsageMissing,
+
+    /// The provider's prompt token count differs from the caller's own
+    /// count.
+    #[error("provider counted {reported} prompt tokens, local count is {local}")]
+    UsageMismatch {
+        /// The caller's count.
+        local: u32,
+        /// The provider's count.
+        reported: u32,
+    },
+
+    /// The model being served is not the one the client is pinned to.
+    #[error("served model identity {actual} does not match pinned {expected}")]
+    ModelMismatch {
+        /// The pinned identity.
+        expected: String,
+        /// The identity the server reported.
+        actual: String,
+    },
 }

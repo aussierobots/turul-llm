@@ -55,15 +55,46 @@ The adapter POSTs to `{base_url}/api/chat` with:
   (Ollama's structured-output mechanism).
 - `options.{num_predict, temperature, top_p}` — derived from
   `ExecutionHints`, only emitted when the hint is `Some(_)`.
+- `options.num_ctx` / `options.num_predict` from a request's
+  `ContextBudget`, taking precedence over `with_num_ctx` and the
+  `max_tokens` hint.
 - `think` — emitted only when set with
   [`OllamaClient::with_think`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_think).
-- `options.num_ctx` — emitted only when set with
-  [`OllamaClient::with_num_ctx`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_num_ctx).
+- `options.num_ctx` — from a request's `ContextBudget`, else from
+  [`OllamaClient::with_num_ctx`](https://docs.rs/turul-llm-ollama/latest/turul_llm_ollama/struct.OllamaClient.html#method.with_num_ctx);
+  omitted when neither is set.
 
 The Ollama envelope is decoded by parsing `message.content` as JSON.
 If the content fails to parse, the adapter returns
 [`LlmError::SchemaViolation`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html#variant.SchemaViolation)
 whose message includes Ollama's `done_reason` as `finish_reason`.
+
+## Usage, stop reason and token ids
+
+Every response carries `usage` (`prompt_eval_count`, `eval_count`) and
+`stop_reason` (`done_reason`) when Ollama reports them. Ollama counts the
+chat template and default system text in `prompt_eval_count`, and it
+silently truncates a prompt longer than the window (reporting the
+truncated count), so wrap the client in `turul_llm_core::GuardedClient`
+to refuse oversized requests before sending.
+
+`OllamaClient::with_generate_endpoint()` uses the templated
+`/api/generate` endpoint, which also returns token ids; they appear
+unsliced in `CompletionResponse::token_ids`. What they cover and how BOS
+and EOS appear varies by model family, so interpreting them is up to the
+caller. Raw mode is not offered because Ollama returns no token ids for
+it.
+
+## Pinning a model
+
+`OllamaClient::with_model_digest(hex)` checks `/api/show` before each
+call and returns `LlmError::ModelMismatch` unless the weights blob named
+by the Modelfile's first `FROM` line has that digest (the blob digest, not
+the manifest digest in `/api/tags`). It identifies the weights only, not
+the template, system text or parameters, and the model can change between
+the check and the call. Models without a local weights blob (for
+example remotely hosted ones) cannot be pinned: every call fails. The
+check costs one extra request per call.
 
 ## Context window
 
