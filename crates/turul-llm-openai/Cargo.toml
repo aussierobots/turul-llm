@@ -11,7 +11,7 @@ rust-version.workspace = true
 description = "OpenAI-compatible adapter for the turul-llm LlmClient trait. Targets /chat/completions with response_format = json_schema."
 
 [dependencies]
-turul-llm-core = { workspace = true }
+turul-llm-core = { workspace = true, features = ["http"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

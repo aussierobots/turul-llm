@@ -1,10 +1,14 @@
 //! Provider-neutral LLM client trait + request/response types + error
 //! taxonomy.
 //!
-//! The crate intentionally carries no transport, no HTTP client, and no
-//! provider SDKs. Concrete adapters live in sibling crates
+//! The crate carries no provider SDKs, and no HTTP client unless the
+//! `http` feature is enabled (adapters enable it; adopters of the trait
+//! do not need to). Concrete adapters live in sibling crates
 //! (`turul-llm-ollama`, `turul-llm-openai`, etc.) so the trait stays
 //! cheap to depend on for callers who do not need a specific provider.
+//! The shared helpers are [`ChatResponseShape`] (decode a chat-style
+//! response) and, behind the `http` feature, `http::send_chat`; adopters
+//! do not need either.
 //!
 //! # The trait
 //!
@@ -32,11 +36,15 @@
 //! The compile-time assertion lives in this crate's tests.
 
 pub mod client;
+pub mod decode;
 pub mod error;
+#[cfg(feature = "http")]
+pub mod http;
 pub mod request;
 pub mod response;
 
 pub use client::LlmClient;
+pub use decode::ChatResponseShape;
 pub use error::LlmError;
 pub use request::{CompletionRequest, ExecutionHints};
 pub use response::CompletionResponse;

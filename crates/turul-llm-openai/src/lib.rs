@@ -18,7 +18,10 @@
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
-use turul_llm_core::{CompletionRequest, CompletionResponse, ExecutionHints, LlmClient, LlmError};
+use turul_llm_core::{
+    ChatResponseShape, CompletionRequest, CompletionResponse, ExecutionHints, LlmClient, LlmError,
+    http::send_chat,
+};
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 const DEFAULT_SCHEMA_NAME: &str = "structured_output";
@@ -158,58 +161,13 @@ impl LlmClient for OpenAiClient {
         apply_hints(&mut body, &request.execution_hints);
 
         let url = self.endpoint();
-        let resp = self
-            .http
-            .post(&url)
-            .bearer_auth(&self.api_key)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    LlmError::Timeout
-                } else {
-                    LlmError::Transport(format!("POST {url} failed: {e}"))
-                }
-            })?;
-
-        let status = resp.status();
-        let text = resp
-            .text()
-            .await
-            .map_err(|e| LlmError::Transport(format!("read body from {url} failed: {e}")))?;
-
-        if !status.is_success() {
-            return Err(LlmError::Provider(format!(
-                "{url} returned HTTP {status}: {text}"
-            )));
-        }
-
-        let envelope: Value = serde_json::from_str(&text)
-            .map_err(|e| LlmError::Provider(format!("envelope parse failed: {e}: {text}")))?;
-        let content = envelope
-            .get("choices")
-            .and_then(|c| c.get(0))
-            .and_then(|c| c.get("message"))
-            .and_then(|m| m.get("content"))
-            .and_then(|c| c.as_str())
-            .ok_or_else(|| {
-                LlmError::Provider(format!(
-                    "response missing /choices/0/message/content: {envelope}"
-                ))
-            })?;
-
-        let parsed = if request.output_schema.is_some() {
-            serde_json::from_str::<Value>(content).map_err(|e| {
-                LlmError::SchemaViolation(format!(
-                    "structured-output payload was not valid JSON: {e}: {content}"
-                ))
-            })?
-        } else {
-            Value::String(content.to_string())
-        };
-
-        Ok(CompletionResponse::new(parsed))
+        send_chat(
+            self.http.post(&url).bearer_auth(&self.api_key).json(&body),
+            &url,
+            &ChatResponseShape::new("/choices/0/message/content", "/choices/0/finish_reason"),
+            request.output_schema.is_some(),
+        )
+        .await
     }
 }
 
@@ -325,5 +283,31 @@ mod tests {
             .await
             .expect_err("must fail");
         assert!(matches!(err, LlmError::SchemaViolation(_)), "got {err:?}");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn truncated_structured_payload_reports_finish_reason() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "{\"a\": \"cut"},
+                    "finish_reason": "length"
+                }]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = OpenAiClient::with_base_url(server.uri(), "k", "m");
+        let err = client
+            .complete(CompletionRequest::new("hi").with_output_schema(json!({"type": "object"})))
+            .await
+            .expect_err("must fail");
+        match err {
+            LlmError::SchemaViolation(m) => assert!(m.contains("finish_reason=length"), "{m}"),
+            other => panic!("got {other:?}"),
+        }
     }
 }

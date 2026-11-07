@@ -15,6 +15,16 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
+reqwest = { workspace = true, optional = true }
+
+[features]
+# Shared send path for HTTP adapters; off by default so the trait crate
+# stays free of an HTTP client. Its API follows reqwest's major version.
+http = ["dep:reqwest"]
+
+[package.metadata.docs.rs]
+features = ["http"]
 
 [dev-dependencies]
 tokio = { workspace = true }
+wiremock = { workspace = true }

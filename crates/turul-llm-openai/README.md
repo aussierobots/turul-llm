@@ -77,7 +77,8 @@ The adapter POSTs to `{base_url}/chat/completions` with:
   `ExecutionHints`, only emitted when the hint is `Some(_)`.
 
 The OpenAI envelope is decoded via `choices[0].message.content`,
-parsed as JSON.
+parsed as JSON. If parsing fails, `SchemaViolation` includes the
+choice's `finish_reason` (for example `length` for a truncated reply).
 
 ## Tests are hermetic
 

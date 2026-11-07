@@ -28,7 +28,8 @@ cargo clippy --workspace --all-targets -- -D warnings  # Lint (deny warnings)
 cargo fmt --all -- --check                # Format check
 
 # Per-crate tests
-cargo test -p turul-llm-core              # Trait + types + errors
+cargo test -p turul-llm-core --features http  # Trait + types + errors + shared send path
+cargo check -p turul-llm-core             # Core without the http feature
 cargo test -p turul-llm-ollama            # Ollama adapter (wiremock-backed)
 cargo test -p turul-llm-openai            # OpenAI adapter (wiremock-backed)
 
@@ -56,13 +57,15 @@ The three library crates publish to crates.io; `examples/greet-ollama` stays `pu
 5. Tag and push **before** publish: `git tag -a vX.Y.Z <commit> -m "..."`, `git push origin vX.Y.Z`. Annotated tags only.
 6. After one authorization, publish the batch in dep order: `-p turul-llm-core` first, then `-p turul-llm-ollama` and `-p turul-llm-openai`. One authorization covers all three.
 
+**Tech-debt gate (before step 6).** Review the diff and the workspace for known debt: logic duplicated across adapters, code/doc/ADR drift, unused or stale manifest entries. Fix it in the same release, or get the maintainer's explicit decision to ship it. Never publish first and report debt afterwards. A fix that adds public API needs the maintainer's permission asked **before** the release is cut, not after.
+
 If a publish fails: crates.io is immutable per-crate, so prior successful uploads stay — fix and rerun only the failed ones. If a tag points at the wrong commit, `git push --delete origin vX.Y.Z`, re-tag, push.
 
 ## Architecture
 
 ### Crate Structure
 
-- `turul-llm-core` — provider-neutral `LlmClient` trait + `CompletionRequest` / `CompletionResponse` / `ExecutionHints` types + `LlmError` taxonomy. No HTTP / runtime deps. The contract surface.
+- `turul-llm-core` — provider-neutral `LlmClient` trait + `CompletionRequest` / `CompletionResponse` / `ExecutionHints` types + `LlmError` taxonomy. No HTTP client unless the default-off `http` feature (shared send path used by the adapters) is on; no runtime deps. The contract surface.
 - `turul-llm-ollama` — Ollama `/api/chat` adapter. Structured output via the `format` field. Configured through constructors (`with_num_ctx`, `with_http_client`); hermetic CI by default.
 - `turul-llm-openai` — OpenAI-compatible adapter via `response_format = { type: "json_schema", ... }`. The API key is passed to the constructor by the caller; not exercised by live calls in default CI.
 - `examples/greet-ollama` — runnable example demonstrating the trait + Ollama adapter end-to-end.

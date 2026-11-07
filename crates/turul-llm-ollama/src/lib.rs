@@ -11,10 +11,14 @@
 use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::Value;
-use turul_llm_core::{CompletionRequest, CompletionResponse, ExecutionHints, LlmClient, LlmError};
+use turul_llm_core::{
+    ChatResponseShape, CompletionRequest, CompletionResponse, ExecutionHints, LlmClient, LlmError,
+    http::send_chat,
+};
 
-/// Default model identifier used when none is supplied.
-const DEFAULT_MODEL: &str = "llama3.1";
+/// Model identifier used by [`OllamaClient::default`] and by callers that
+/// need the same fallback.
+pub const DEFAULT_MODEL: &str = "llama3.1";
 
 /// Client targeting an Ollama `/api/chat` endpoint.
 #[derive(Debug, Clone)]
@@ -145,54 +149,13 @@ impl LlmClient for OllamaClient {
         };
 
         let url = self.chat_url();
-        let resp = self.http.post(&url).json(&body).send().await.map_err(|e| {
-            if e.is_timeout() {
-                LlmError::Timeout
-            } else {
-                LlmError::Transport(format!("POST {url} failed: {e}"))
-            }
-        })?;
-
-        let status = resp.status();
-        let text = resp
-            .text()
-            .await
-            .map_err(|e| LlmError::Transport(format!("read body from {url} failed: {e}")))?;
-
-        if !status.is_success() {
-            return Err(LlmError::Provider(format!(
-                "{url} returned HTTP {status}: {text}"
-            )));
-        }
-
-        let envelope: Value = serde_json::from_str(&text)
-            .map_err(|e| LlmError::Provider(format!("envelope parse failed: {e}: {text}")))?;
-        let content = envelope
-            .get("message")
-            .and_then(|m| m.get("content"))
-            .and_then(|c| c.as_str())
-            .ok_or_else(|| {
-                LlmError::Provider(format!("response missing /message/content: {envelope}"))
-            })?;
-
-        // When the caller asked for structured output, the content must
-        // be JSON. When they didn't, wrap the raw text as a JSON string
-        // so `parsed_output` is always populated.
-        let parsed = if request.output_schema.is_some() {
-            serde_json::from_str::<Value>(content).map_err(|e| {
-                let done_reason = envelope
-                    .get("done_reason")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("unknown");
-                LlmError::SchemaViolation(format!(
-                    "structured-output payload was not valid JSON (done_reason={done_reason}): {e}: {content}"
-                ))
-            })?
-        } else {
-            Value::String(content.to_string())
-        };
-
-        Ok(CompletionResponse::new(parsed))
+        send_chat(
+            self.http.post(&url).json(&body),
+            &url,
+            &ChatResponseShape::new("/message/content", "/done_reason"),
+            request.output_schema.is_some(),
+        )
+        .await
     }
 }
 
@@ -335,7 +298,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn truncated_structured_payload_reports_done_reason() {
+    async fn truncated_structured_payload_reports_finish_reason() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/chat"))
@@ -353,7 +316,7 @@ mod tests {
             .await
             .expect_err("must fail");
         match err {
-            LlmError::SchemaViolation(m) => assert!(m.contains("done_reason=length"), "{m}"),
+            LlmError::SchemaViolation(m) => assert!(m.contains("finish_reason=length"), "{m}"),
             other => panic!("got {other:?}"),
         }
     }

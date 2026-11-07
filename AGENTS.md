@@ -29,7 +29,8 @@ cargo test --workspace                    # Hermetic test suite
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 
-cargo test -p turul-llm-core              # Per-crate
+cargo test -p turul-llm-core --features http  # Per-crate (includes the shared send path)
+cargo check -p turul-llm-core             # Core without the http feature
 cargo test -p turul-llm-ollama
 cargo test -p turul-llm-openai
 
@@ -64,13 +65,15 @@ The three library crates publish to crates.io; `examples/greet-ollama` stays `pu
 5. Tag and push **before** publish: `git tag -a vX.Y.Z <commit> -m "..."`, `git push origin vX.Y.Z`. Annotated tags only.
 6. After one authorization, publish the batch in dep order: `-p turul-llm-core` first, then `-p turul-llm-ollama` and `-p turul-llm-openai`. One authorization covers all three.
 
+**Tech-debt gate (before step 6).** Review the diff and the workspace for known debt: logic duplicated across adapters, code/doc/ADR drift, unused or stale manifest entries. Fix it in the same release, or get the maintainer's explicit decision to ship it. Never publish first and report debt afterwards. A fix that adds public API needs the maintainer's permission asked **before** the release is cut, not after.
+
 If a publish fails: crates.io is immutable per-crate, so prior successful uploads stay — fix and rerun only the failed ones. If a tag points at the wrong commit, `git push --delete origin vX.Y.Z`, re-tag, push.
 
 ## Architecture
 
 ### Crate Structure
 
-- `turul-llm-core` — `LlmClient` trait + request/response/error types. No HTTP or runtime deps.
+- `turul-llm-core` — `LlmClient` trait + request/response/error types. No HTTP client unless the default-off `http` feature (the adapters' shared send path) is on; no runtime deps.
 - `turul-llm-ollama` — Ollama `/api/chat` adapter. Structured output via `format` field.
 - `turul-llm-openai` — OpenAI-compatible adapter via `response_format = { type: "json_schema", ... }`.
 - `examples/greet-ollama` — runnable end-to-end example.

@@ -2,10 +2,11 @@
 
 The provider-neutral contract for calling an LLM with structured-output
 JSON Schema and getting parsed JSON back. One async method, zero
-transport dependencies.
+transport dependencies by default (the optional `http` feature adds the
+shared send path the adapters use).
 
-This crate is the **trait + types only**. Concrete provider adapters
-live in sibling crates so this crate stays cheap to depend on for code
+This crate is the **trait + types**, plus the response decoder the
+adapters share. Concrete provider adapters live in sibling crates so this crate stays cheap to depend on for code
 that doesn't know yet which provider it will run against.
 
 | Adapter crate | Provider |
@@ -59,6 +60,13 @@ without changing this function.
 - [`LlmError`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html)
   — `#[non_exhaustive]` taxonomy: `Transport` / `Provider` /
   `SchemaViolation` / `Timeout` / `Other`.
+
+- [`ChatResponseShape`](https://docs.rs/turul-llm-core/latest/turul_llm_core/decode/struct.ChatResponseShape.html)
+  — adapter plumbing: decodes a chat-style provider response (status,
+  envelope, structured-output parse). With the `http` feature,
+  `http::send_chat` also owns sending and transport-error mapping; that
+  module's API follows reqwest's major version.
+  Adopters do not need either.
 
 All public structs and the error enum are `#[non_exhaustive]`, so the
 contract can grow additively without breaking adopters.

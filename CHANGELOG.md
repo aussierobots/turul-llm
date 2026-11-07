@@ -4,6 +4,31 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.3] — 2026-11-07
+
+Patch release removing duplicated response handling between the
+adapters.
+
+### Added
+
+- `turul_llm_core::ChatResponseShape` (`#[non_exhaustive]`, JSON-pointer
+  locators) with `decode`: the single definition of status handling,
+  envelope parsing and the structured-output contract.
+- `turul_llm_core::http::send_chat` behind the default-off `http`
+  feature (optional `reqwest`): the single send path with timeout and
+  transport-error mapping. The adapters enable the feature. The
+  module's API follows reqwest's major version (documented in the module
+  and README). CI now also checks core without the feature.
+- `turul_llm_ollama::DEFAULT_MODEL`, used by `OllamaClient::default` and
+  `examples/greet-ollama`.
+
+### Changed
+
+- Both adapters send and decode through `send_chat` and `ChatResponseShape`. Both
+  report the provider's finish/done reason in the `SchemaViolation`
+  message, labelled `finish_reason=`; Ollama's `done_reason=` label is
+  renamed. Non-2xx messages print the numeric status.
+
 ## [0.1.2] — 2026-11-07
 
 Patch release: gemma4 structured output was truncated at Ollama's

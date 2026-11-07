@@ -61,7 +61,7 @@ The adapter POSTs to `{base_url}/api/chat` with:
 The Ollama envelope is decoded by parsing `message.content` as JSON.
 If the content fails to parse, the adapter returns
 [`LlmError::SchemaViolation`](https://docs.rs/turul-llm-core/latest/turul_llm_core/error/enum.LlmError.html#variant.SchemaViolation)
-whose message includes Ollama's `done_reason`.
+whose message includes Ollama's `done_reason` as `finish_reason`.
 
 ## Context window
 
@@ -71,7 +71,7 @@ depends on the host's VRAM (4k, 32k or 256k tokens; see
 `OLLAMA_CONTEXT_LENGTH` in `ollama serve --help`). When the window
 fills, Ollama stops with `done_reason: "length"` and a structured
 response is cut off mid-JSON, so it fails with `SchemaViolation`
-(`done_reason=length`). `max_tokens` (`num_predict`) cannot raise the
+(`finish_reason=length`). `max_tokens` (`num_predict`) cannot raise the
 window.
 
 Raise it in either place:

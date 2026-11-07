@@ -47,7 +47,7 @@ fn ollama_base_url() -> Option<String> {
 }
 
 fn model() -> String {
-    std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.1".to_string())
+    std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| turul_llm_ollama::DEFAULT_MODEL.to_string())
 }
 
 struct OfflineStub;
