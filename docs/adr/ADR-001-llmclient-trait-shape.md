@@ -138,8 +138,8 @@ adopter reports a real need.
 - Retry policy. Belongs in a wrapper client
   (`RetryingLlmClient<C: LlmClient>`), not on the trait.
 - Token-count / cost-attribution metrics. Would add an optional
-  `LlmUsage` field to `CompletionResponse`. Defer — adopters can
-  attach telemetry in a wrapper today.
+  `LlmUsage` field to `CompletionResponse`. Deferred here; token usage
+  and stop reason were added as `Usage` / `StopReason` by ADR-003.
 - Tool-call / function-call schemas. Provider contracts vary widely
   (OpenAI tool_calls, Anthropic content blocks). Locking this into v1
   before a third provider exists risks shaping the trait around two

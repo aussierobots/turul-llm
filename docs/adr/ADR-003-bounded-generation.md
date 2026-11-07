@@ -68,6 +68,8 @@ error behaviour are unchanged.
    `Option<u32>`) and `stop_reason: Option<StopReason>`
    (`Stop`, `Length`, `Other(String)`; `#[non_exhaustive]`).
    `CompletionResponse::new` is unchanged and leaves both `None`.
+   `CompletionResponse` also gains `token_ids: Option<Vec<u32>>`: token
+   ids the provider returned, verbatim and unsliced (see item 8).
    `ChatResponseShape` grows through builder methods
    (`with_usage_pointers`, existing finish-reason locator); the stop-reason
    mapping (`stop` → `Stop`, `length` → `Length`, anything else →
@@ -89,9 +91,12 @@ error behaviour are unchanged.
      from the local count.
    The guard reads `context_tokens` only from the budget; it never queries
    the provider.
-5. **New `LlmError` variants**, all struct-like and `#[non_exhaustive]`:
-   `InvalidRequest`, `ContextOverflow`, `IncompleteGeneration`,
-   `UsageMissing`, `UsageMismatch`, `ModelMismatch`.
+5. **New `LlmError` variants**: `InvalidRequest`, `ContextOverflow`,
+   `IncompleteGeneration`, `UsageMissing`, `UsageMismatch`,
+   `ModelMismatch`. The enum stays `#[non_exhaustive]`, which is what
+   allows adding variants later; the variants themselves are not marked,
+   so adapters, counters and other implementers outside core can build
+   and match them (a variant-level attribute would forbid both).
 
 ### Adapters
 
@@ -114,14 +119,21 @@ error behaviour are unchanged.
    template, system text or parameters; and the model can change between
    the check and the call.
 
+8. **Token ids (Ollama)** — `OllamaClient::with_generate_endpoint()`
+   switches to the templated `/api/generate` endpoint, the only one that
+   returns `context`, and `CompletionResponse::token_ids` carries that
+   array verbatim. The library does not slice it, strip special tokens or
+   verify anything against it: where the prompt ends (`usage.prompt_tokens`
+   bounds the evaluated prefix) and how BOS/EOS appear vary by model
+   family, so interpretation stays with the caller. A value at `/context`
+   that is not an array of token ids is a provider error; an absent one is
+   `None`. When the caller's `TokenCounter` is accurate, `GuardedClient`'s
+   pre-send refusal means the server does not truncate, so the ids are not
+   a pre-truncation artefact; with an inaccurate counter they can be (the
+   `Exact` policy detects that after the fact).
+
 ## Deferred
 
-- **Token ids and `/api/generate`.** Ollama's `context` field is the only
-  source of prompt token ids, it is only returned by `/api/generate`, it
-  holds ids before truncation (so it cannot prove what was evaluated), and
-  its BOS/EOS handling differs by model family. The count-level proof
-  (`Exact` against a template-aware counter) is delivered now; a
-  token-level proof needs a stable provider contract first.
 - **Raw mode (`raw: true`).** Returns no `context` and moves template
   correctness onto every caller; it cannot provide the proof it would be
   used for.
@@ -131,12 +143,23 @@ error behaviour are unchanged.
 - Strictness lives in one place (`GuardedClient`) and is opt-in; plain
   clients behave as before.
 - Pinning costs one extra HTTP request per call; callers that do not pin
-  pay nothing.
+  pay nothing. Models with no local weights blob cannot be pinned.
+- A structured-output call whose text was cut off fails JSON parsing in
+  the adapter before the guard sees the stop reason, so it surfaces as
+  `SchemaViolation` (with the `finish_reason` in the message), not
+  `IncompleteGeneration`. Both are errors.
 - `Exact` is only meaningful with a counter that models the served
   template; with a bare-prompt counter it fails by design, which is why
   the policy is an explicit argument.
 - Version: all changes are additive (non-exhaustive types and enums), so
   the release is a patch bump.
+
+## Revision log
+
+- 2026-11-07: Accepted.
+- 2026-11-07: token ids and the generate endpoint moved from Deferred into
+  scope (item 8) after evidence that a prompt-prefix proof holds when
+  pre-send refusal rules out truncation; raw mode stays rejected.
 
 ## Alternatives rejected
 
