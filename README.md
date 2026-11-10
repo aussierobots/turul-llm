@@ -1,5 +1,11 @@
 # turul-llm
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/turul/logo-dark.png">
+  <img src="docs/assets/turul/logo-light.png" alt="Turul LLM" width="600">
+</picture>
+
+
 A provider-neutral LLM client trait and adapters for Rust. Sibling
 workspace to [`turul-a2a`](https://github.com/aussierobots/turul-a2a) —
 they share an author and a design vocabulary, but they ship on
@@ -105,3 +111,8 @@ The trait may evolve until then. Per-release changes are in
 
 Dual-licensed under Apache-2.0 OR MIT, matching the wider `turul-*`
 ecosystem.
+
+## Brand artwork
+
+Turul brand artwork is © 2026 Toast Technology Pty Ltd, all rights reserved,
+and is excluded from the software licence. See the [artwork notice](docs/assets/turul/ARTWORK-NOTICE.md) and [master assets](https://github.com/aussierobots/turul-brand).
