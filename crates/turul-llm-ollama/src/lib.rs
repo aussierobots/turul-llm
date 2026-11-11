@@ -1,13 +1,54 @@
 //! Ollama adapter for [`turul_llm_core::LlmClient`].
 //!
-//! Wraps Ollama's `/api/chat` endpoint (or the templated `/api/generate`
-//! endpoint, see [`OllamaClient::with_generate_endpoint`]). The caller supplies a rendered
-//! prompt + optional JSON Schema; this crate forwards the schema as
-//! Ollama's `format` field (structured output) and parses the
-//! `message.content` string as JSON before returning.
+//! [`OllamaClient`] sends the rendered prompt to Ollama's `/api/chat`
+//! endpoint, forwards the optional JSON Schema as Ollama's `format` field
+//! (structured output), and parses `message.content` as JSON. It can instead
+//! use the templated `/api/generate` endpoint, which returns token ids; see
+//! [`OllamaClient::with_generate_endpoint`].
 //!
-//! Live integration is opt-in via env vars (see `examples/greet-ollama`);
-//! the crate's own tests use `wiremock` so they remain hermetic.
+//! Use this crate to run structured-output calls against a local or remote
+//! Ollama server. The trait, request and response types live in
+//! [`turul_llm_core`]; swap in
+//! [`turul-llm-openai`](https://docs.rs/turul-llm-openai) without touching
+//! calling code.
+//!
+//! # Example
+//!
+//! ```toml
+//! [dependencies]
+//! turul-llm-core = "0.1"
+//! turul-llm-ollama = "0.1"
+//! tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+//! serde_json = "1"
+//! ```
+//!
+//! ```rust,no_run
+//! use serde_json::json;
+//! use turul_llm_core::{CompletionRequest, LlmClient};
+//! use turul_llm_ollama::{DEFAULT_MODEL, OllamaClient};
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let client = OllamaClient::new("http://localhost:11434", DEFAULT_MODEL);
+//! let request = CompletionRequest::new("Greet Ada as JSON.").with_output_schema(json!({
+//!     "type": "object",
+//!     "properties": { "greeting": { "type": "string" } },
+//!     "required": ["greeting"]
+//! }));
+//! let response = client.complete(request).await?;
+//! println!("{}", response.parsed_output);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Where next
+//!
+//! - [`OllamaClient::with_num_ctx`], [`OllamaClient::with_think`] and
+//!   [`OllamaClient::with_model_digest`] tune the request.
+//! - [`turul_llm_core::GuardedClient`] refuses over-long prompts and
+//!   incomplete generations.
+//! - [`greet-ollama`](https://github.com/aussierobots/turul-llm/tree/main/examples/greet-ollama):
+//!   offline by default, live with `OLLAMA_BASE_URL`.
 
 use async_trait::async_trait;
 use serde::Serialize;

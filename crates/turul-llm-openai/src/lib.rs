@@ -1,19 +1,55 @@
 //! OpenAI-compatible adapter for [`turul_llm_core::LlmClient`].
 //!
-//! Targets the chat completions API at `{base_url}/chat/completions`
-//! with a Bearer-token `Authorization` header. The `base_url` is
-//! configurable so this adapter also works against OpenAI-compatible
-//! gateways (Together.ai, vLLM, Groq, etc.); the default points at
-//! `https://api.openai.com/v1`.
+//! [`OpenAiClient`] calls the chat completions API at
+//! `{base_url}/chat/completions` with a Bearer token. Structured output uses
+//! `response_format = { type: "json_schema", ... }` with `strict: true`, and
+//! content that still fails to parse as JSON surfaces as
+//! [`LlmError::SchemaViolation`]. The base URL defaults to
+//! `https://api.openai.com/v1` and can point at any OpenAI-compatible gateway
+//! via [`OpenAiClient::with_base_url`].
 //!
-//! Structured output uses `response_format = { type: "json_schema",
-//! json_schema: { name, schema, strict } }` — the official structured
-//! output path. The adapter sets `strict: true` so the model is held to
-//! the schema and surfaces a [`LlmError::SchemaViolation`] when the
-//! returned content still fails to parse as JSON.
+//! Use this crate for OpenAI or an OpenAI-compatible server. The trait,
+//! request and response types live in [`turul_llm_core`]; swap in
+//! [`turul-llm-ollama`](https://docs.rs/turul-llm-ollama) without touching
+//! calling code.
 //!
-//! Tests are `wiremock`-backed; live calls would require
-//! `OPENAI_API_KEY` and are out of scope for the default workflow.
+//! # Example
+//!
+//! ```toml
+//! [dependencies]
+//! turul-llm-core = "0.1"
+//! turul-llm-openai = "0.1"
+//! tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+//! serde_json = "1"
+//! ```
+//!
+//! ```rust,no_run
+//! use serde_json::json;
+//! use turul_llm_core::{CompletionRequest, LlmClient};
+//! use turul_llm_openai::OpenAiClient;
+//!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let api_key = std::env::var("OPENAI_API_KEY")?;
+//! let client = OpenAiClient::new(api_key, "gpt-4o-mini");
+//! let request = CompletionRequest::new("Greet Ada as JSON.").with_output_schema(json!({
+//!     "type": "object",
+//!     "properties": { "greeting": { "type": "string" } },
+//!     "required": ["greeting"]
+//! }));
+//! let response = client.complete(request).await?;
+//! println!("{}", response.parsed_output);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Where next
+//!
+//! - [`OpenAiClient::with_schema_name`] sets the `json_schema.name` sent to the provider.
+//! - [`turul_llm_core::GuardedClient`] refuses over-long prompts and
+//!   incomplete generations.
+//! - [`greet-ollama`](https://github.com/aussierobots/turul-llm/tree/main/examples/greet-ollama):
+//!   the same call shape end to end.
 
 use async_trait::async_trait;
 use serde::Serialize;

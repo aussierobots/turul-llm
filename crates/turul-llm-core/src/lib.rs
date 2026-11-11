@@ -1,39 +1,66 @@
-//! Provider-neutral LLM client trait + request/response types + error
+//! Provider-neutral LLM client trait, request and response types, and error
 //! taxonomy.
 //!
-//! The crate carries no provider SDKs, and no HTTP client unless the
-//! `http` feature is enabled (adapters enable it; adopters of the trait
-//! do not need to). Concrete adapters live in sibling crates
-//! (`turul-llm-ollama`, `turul-llm-openai`, etc.) so the trait stays
-//! cheap to depend on for callers who do not need a specific provider.
-//! The shared helpers are [`ChatResponseShape`] (decode a chat-style
-//! response) and, behind the `http` feature, `http::send_chat`; adopters
-//! do not need either.
+//! [`LlmClient`] has one async method, [`complete`](LlmClient::complete):
+//! it takes a fully rendered prompt plus an optional JSON Schema 2020-12
+//! output schema in a [`CompletionRequest`] and returns a
+//! [`CompletionResponse`] holding the parsed JSON. The crate ships no
+//! provider SDK and, without the `http` feature, no HTTP client.
 //!
-//! # The trait
+//! Depend on this crate to write code that is generic over providers, or to
+//! implement an adapter. To call a model, add an adapter such as
+//! [`turul-llm-ollama`](https://docs.rs/turul-llm-ollama) or
+//! [`turul-llm-openai`](https://docs.rs/turul-llm-openai).
 //!
-//! [`LlmClient`] exposes a single async operation: take a fully-rendered
-//! prompt plus an optional JSON Schema 2020-12 document describing the
-//! expected output shape, return a parsed JSON value that the caller can
-//! validate / consume.
+//! The caller renders the prompt and validates `parsed_output` against its
+//! own schema; the trait does neither. Adapters pass the schema through to
+//! the provider's structured-output API and must not loosen it.
+//! `LlmClient` is object-safe, so `Arc<dyn LlmClient>` can switch providers
+//! at runtime.
 //!
-//! Callers are expected to:
+//! # Example
 //!
-//! - Render the prompt themselves (e.g. via a manifest template engine).
-//!   The trait does not own the template surface — different callers
-//!   render prompts differently.
-//! - Supply the output schema when they need structured output. Adapters
-//!   pass it through to the provider's structured-output API and MUST
-//!   NOT loosen what the schema declares.
-//! - Validate the returned `parsed_output` against their schema. The
-//!   trait deliberately stops short of running validation itself so that
-//!   adopters can pick their preferred JSON Schema validator.
+//! Code written against the trait works with any adapter:
 //!
-//! # Object safety
+//! ```toml
+//! [dependencies]
+//! turul-llm-core = "0.1"
+//! serde_json = "1"
+//! ```
 //!
-//! `LlmClient` is object-safe: callers that want to swap providers at
-//! runtime hold `Arc<dyn LlmClient>` and route based on configuration.
-//! The compile-time assertion lives in this crate's tests.
+//! ```rust
+//! use serde_json::{Value, json};
+//! use turul_llm_core::{CompletionRequest, ExecutionHints, LlmClient, LlmError};
+//!
+//! async fn greeting(client: &dyn LlmClient, name: &str) -> Result<Value, LlmError> {
+//!     let schema = json!({
+//!         "type": "object",
+//!         "properties": { "greeting": { "type": "string" } },
+//!         "required": ["greeting"]
+//!     });
+//!     let request = CompletionRequest::new(format!("Greet {name} as JSON."))
+//!         .with_output_schema(schema)
+//!         .with_execution_hints(ExecutionHints::new().with_temperature(0.0));
+//!     Ok(client.complete(request).await?.parsed_output)
+//! }
+//! ```
+//!
+//! # Features
+//!
+//! | Feature | Default | Enables |
+//! |---|---|---|
+//! | `http` | no | `http::send_chat`, the shared send path the adapters use; pulls in `reqwest` |
+//!
+//! [`ChatResponseShape`] (chat-style response decoding) is always available.
+//! [`GuardedClient`] wraps any client to refuse over-long prompts and
+//! incomplete generations.
+//!
+//! # Where next
+//!
+//! - [`turul-llm-ollama`](https://docs.rs/turul-llm-ollama): Ollama adapter.
+//! - [`turul-llm-openai`](https://docs.rs/turul-llm-openai): OpenAI-compatible adapter.
+//! - [`greet-ollama`](https://github.com/aussierobots/turul-llm/tree/main/examples/greet-ollama):
+//!   runnable end-to-end example.
 
 pub mod client;
 pub mod decode;
