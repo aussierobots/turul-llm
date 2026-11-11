@@ -4,6 +4,13 @@ All notable changes to the `turul-llm` workspace are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Point package homepages and project links to Aussie Robots; add explicit API documentation links and review discovery metadata.
+
+
 ## [0.1.5] — 2026-11-07
 
 Patch release adding opt-in bounded generation (additive; existing calls
