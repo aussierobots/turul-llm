@@ -9,6 +9,8 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 description = "Ollama adapter for the turul-llm LlmClient trait. Targets /api/chat with structured output via the `format` field."
+documentation = "https://docs.rs/turul-llm-ollama"
+homepage.workspace = true
 
 [dependencies]
 turul-llm-core = { workspace = true, features = ["http"] }

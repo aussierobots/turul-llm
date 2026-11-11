@@ -9,6 +9,8 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 description = "Provider-neutral LLM client trait and types — one async method, JSON-Schema-driven structured output, zero provider deps."
+documentation = "https://docs.rs/turul-llm-core"
+homepage.workspace = true
 
 [dependencies]
 serde = { workspace = true }
