@@ -8,6 +8,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Rewrite the crate-level docs of `turul-llm-core`, `turul-llm-ollama` and `turul-llm-openai` as docs.rs front pages with a compiling example; version 0.1.6 (patch bump of all three crates; no API change).
 - Point package homepages and project links to Aussie Robots; add explicit API documentation links and review discovery metadata.
 
 
